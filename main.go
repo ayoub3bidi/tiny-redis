@@ -2,44 +2,34 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net"
-	"os"
 )
 
-func main() {
-	fmt.Println("Listening on port :6379")
-
-	// Create a new server
-	l, err := net.Listen("tcp", ":6379")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// Listen for connections
-	conn, err := l.Accept()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
+func handleConnection(conn net.Conn) {
 	defer conn.Close()
+	reader := NewReader(conn)
+	writer := NewWriter(conn)
 
 	for {
-		buf := make([]byte, 1024)
-
-		// read message from client
-		_, err = conn.Read(buf)
+		val, err := reader.Read()
 		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			fmt.Println("error reading from client: ", err.Error())
-			os.Exit(1)
+			fmt.Println("client disconnected:", err)
+			return
 		}
+		resp := HandleCommand(val)
+		writer.Write(resp)
+	}
+}
 
-		// ignore request and send back a PONG
-		conn.Write([]byte("+OK\r\n"))
+func main() {
+	ln, err := net.Listen("tcp", ":6379")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("TinyRedis listening on :6379")
+
+	for {
+		conn, _ := ln.Accept()
+		go handleConnection(conn)
 	}
 }
