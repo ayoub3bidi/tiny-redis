@@ -1,4 +1,4 @@
-# Mini Redis (Go)
+# Tiny Redis
 
 A toy Redis clone written in Go. Supports:
 - RESP protocol (parsing and writing).
@@ -66,6 +66,3 @@ This project teaches you:
 * No expiry (like `SETEX`).
 * AOF is append-only, not replayed at startup.
 * Single-threaded datastore with global locks.
-
-This is a learning project, not production Redis!
-
