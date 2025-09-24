@@ -2,83 +2,83 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
+)
+
+// RESP Value types
+const (
+	TypeString = '+'
+	TypeError  = '-'
+	TypeInt    = ':'
+	TypeBulk   = '$'
+	TypeArray  = '*'
 )
 
 type Value struct {
-	typ   string
+	typ   byte
 	str   string
-	num   int
-	bulk  string
+	bulk  []byte
 	array []Value
 }
 
-type Reader struct {
-	r *bufio.Reader
-}
-
-func NewReader(r io.Reader) *Reader {
-	return &Reader{r: bufio.NewReader(r)}
-}
-
-func (rd *Reader) Read() (Value, error) {
-	b, err := rd.r.ReadByte()
+// Parse RESP input into Value
+func ReadValue(r *bufio.Reader) (Value, error) {
+	prefix, err := r.ReadByte()
 	if err != nil {
 		return Value{}, err
 	}
 
-	switch b {
-	case '+': // simple string
-		line, _ := rd.readLine()
-		return Value{typ: "string", str: line}, nil
-	case '$': // bulk string
-		line, _ := rd.readLine()
-		n, _ := strconv.Atoi(line)
-		buf := make([]byte, n+2) // include \r\n
-		io.ReadFull(rd.r, buf)
-		return Value{typ: "bulk", bulk: string(buf[:n])}, nil
-	case '*': // array
-		line, _ := rd.readLine()
-		n, _ := strconv.Atoi(line)
-		arr := make([]Value, 0, n)
-		for i := 0; i < n; i++ {
-			val, _ := rd.Read()
-			arr = append(arr, val)
+	switch prefix {
+	case TypeString:
+		line, _ := r.ReadString('\n')
+		return Value{typ: TypeString, str: strings.TrimSpace(line)}, nil
+	case TypeBulk:
+		lenLine, _ := r.ReadString('\n')
+		l, _ := strconv.Atoi(strings.TrimSpace(lenLine))
+		buf := make([]byte, l+2) // +2 for CRLF
+		_, err := io.ReadFull(r, buf)
+		if err != nil {
+			return Value{}, err
 		}
-		return Value{typ: "array", array: arr}, nil
+		return Value{typ: TypeBulk, bulk: buf[:l]}, nil
+	case TypeArray:
+		lenLine, _ := r.ReadString('\n')
+		count, _ := strconv.Atoi(strings.TrimSpace(lenLine))
+		arr := make([]Value, count)
+		for i := 0; i < count; i++ {
+			v, err := ReadValue(r)
+			if err != nil {
+				return Value{}, err
+			}
+			arr[i] = v
+		}
+		return Value{typ: TypeArray, array: arr}, nil
 	default:
-		return Value{}, fmt.Errorf("unknown RESP type %q", b)
+		return Value{}, errors.New("unknown RESP type")
 	}
 }
 
-func (rd *Reader) readLine() (string, error) {
-	line, err := rd.r.ReadString('\n')
-	if err != nil {
-		return "", err
-	}
-	return line[:len(line)-2], nil // strip \r\n
-}
-
-type Writer struct {
-	w io.Writer
-}
-
-func NewWriter(w io.Writer) *Writer {
-	return &Writer{w: w}
-}
-
-func (wr *Writer) Write(v Value) error {
+// Marshal converts Value back to RESP format
+func (v Value) Marshal() string {
 	switch v.typ {
-	case "string":
-		_, err := fmt.Fprintf(wr.w, "+%s\r\n", v.str)
-		return err
-	case "bulk":
-		_, err := fmt.Fprintf(wr.w, "$%d\r\n%s\r\n", len(v.bulk), v.bulk)
-		return err
+	case TypeString:
+		return fmt.Sprintf("+%s\r\n", v.str)
+	case TypeError:
+		return fmt.Sprintf("-%s\r\n", v.str)
+	case TypeBulk:
+		return fmt.Sprintf("$%d\r\n%s\r\n", len(v.bulk), v.bulk)
+	case TypeArray:
+		var sb strings.Builder
+		sb.WriteString(fmt.Sprintf("*%d\r\n", len(v.array)))
+		for _, item := range v.array {
+			sb.WriteString(item.Marshal())
+		}
+		return sb.String()
 	default:
-		_, err := fmt.Fprintf(wr.w, "+OK\r\n")
-		return err
+		return "-ERR unknown type\r\n"
 	}
 }

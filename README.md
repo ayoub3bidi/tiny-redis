@@ -1,66 +1,71 @@
-# Tiny Redis (Redis Clone in Go)
+# Mini Redis (Go)
 
-A minimal Redis-like in-memory database written in Go.  
-Supports a subset of Redis commands (`PING`, `SET`, `GET`) and communicates using the [RESP protocol](https://redis.io/docs/latest/develop/reference/protocol-spec/).
-
----
-
-## 🚀 Features
-- TCP server listening on port **6379** (default Redis port).
-- RESP serialization/deserialization implemented from scratch.
-- Basic commands:
-  - `PING` → replies with `PONG`
-  - `SET key value` → store a key-value pair
-  - `GET key` → retrieve a value by key
-- In-memory store using Go maps.
-- Lightweight, under 300 lines of Go code.
+A toy Redis clone written in Go. Supports:
+- RESP protocol (parsing and writing).
+- Commands: `PING`, `SET`, `GET`.
+- In-memory datastore.
+- Append-Only File (AOF) persistence.
 
 ---
 
-## 📂 Project Structure
-```
-
-tiny-redis/
-├── main.go      # TCP server & connection handler
-├── resp.go      # RESP reader/writer
-├── handler.go   # Command dispatcher (PING, SET, GET)
-└── go.mod
-
-````
-
-*(A future `aof.go` file will add persistence.)*
-
----
-
-## 🛠️ Installation & Running
-
-Clone the repo and run:
-
+## 📌 Run the Server
 ```bash
-git clone https://github.com/your-username/tiny-redis.git
-cd tiny-redis
 go run .
 ````
 
-Server will start on:
+Server runs on port **6379** (default Redis port).
+
+---
+
+## 📌 Test with redis-cli
+
+Open another terminal:
+
+```bash
+redis-cli
+```
+
+### Example:
 
 ```
-TinyRedis listening on :6379
+127.0.0.1:6379> PING
+PONG
+
+127.0.0.1:6379> SET foo bar
+OK
+
+127.0.0.1:6379> GET foo
+"bar"
 ```
 
 ---
 
-## 🧪 Testing with redis-cli
+## 📂 Code Overview
 
-You can connect using the standard Redis CLI:
+* **main.go** → Starts TCP server, accepts connections.
+* **resp.go** → Parses and serializes RESP protocol messages.
+* **handler.go** → Handles commands (`PING`, `SET`, `GET`) and manages datastore.
+* **aof.go** → Simple Append-Only File persistence.
 
-```bash
-redis-cli ping
-# -> PONG
+---
 
-redis-cli set mykey hello
-# -> OK
+## 📖 Learning Goals
 
-redis-cli get mykey
-# -> "hello"
-```
+This project teaches you:
+
+* How Redis speaks with clients using RESP.
+* How to implement a TCP server in Go.
+* How to parse and generate protocols.
+* Basics of persistence with append-only logs.
+
+---
+
+## ⚠️ Limitations
+
+* Only `PING`, `SET`, `GET` supported.
+* No expiry (like `SETEX`).
+* AOF is append-only, not replayed at startup.
+* Single-threaded datastore with global locks.
+
+This is a learning project, not production Redis!
+
